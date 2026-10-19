@@ -11,7 +11,9 @@
       {
         "Name": "Aadi"
       }
-    ]
+    ],
+    "Website": "https://github.com/aditya-kumar-k/hud-macos-dock",
+    "BugTracker": "https://github.com/aditya-kumar-k/hud-macos-dock/issues"
   },
   "X-Plasma-API-Minimum-Version": "6.0",
   "KPackageStructure": "Plasma/Applet"
