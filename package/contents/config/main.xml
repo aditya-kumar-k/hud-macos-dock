@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+      http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+    <kcfgfile name=""/>
+    <group name="General">
+        <entry name="apps" type="String">
+            <label>JSON array of dock apps: [{id, name, icon, path}]</label>
+            <default>[]</default>
+        </entry>
+        <entry name="iconSize" type="Int">
+            <label>Icon size in pixels</label>
+            <default>52</default>
+        </entry>
+        <entry name="zoom" type="Double">
+            <label>Magnification of the icon under the pointer (1 = off)</label>
+            <default>1.7</default>
+        </entry>
+        <entry name="spacing" type="Int">
+            <label>Gap between icons</label>
+            <default>10</default>
+        </entry>
+        <entry name="bounceCount" type="Int">
+            <label>Number of bounces when launching an app (0 = off)</label>
+            <default>3</default>
+        </entry>
+        <entry name="vertical" type="Bool">
+            <label>Vertical dock</label>
+            <default>false</default>
+        </entry>
+        <entry name="glassTint" type="Int">
+            <label>Glass tint darkness in percent (0 = clear)</label>
+            <default>15</default>
+        </entry>
+        <entry name="glassBlur" type="Int">
+            <label>Glass blur strength in percent</label>
+            <default>100</default>
+        </entry>
+        <entry name="glassSheen" type="Int">
+            <label>Strength of the top-lit sheen in percent</label>
+            <default>100</default>
+        </entry>
+        <entry name="showLabels" type="Bool">
+            <label>Show app name above the hovered icon</label>
+            <default>true</default>
+        </entry>
+    </group>
+</kcfg>

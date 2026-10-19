@@ -1,0 +1,18 @@
+{
+  "KPlugin": {
+    "Id": "com.aadi.huddock",
+    "Name": "HUD Dock",
+    "Description": "macOS-style dock with only the apps you choose: icon magnification, launch bounce, a frosted-glass shelf and a shortcut that pops it up over any window.",
+    "Version": "1.0.0",
+    "Category": "Application Launchers",
+    "Icon": "application-menu",
+    "License": "GPL-3.0-or-later",
+    "Authors": [
+      {
+        "Name": "Aadi"
+      }
+    ]
+  },
+  "X-Plasma-API-Minimum-Version": "6.0",
+  "KPackageStructure": "Plasma/Applet"
+}

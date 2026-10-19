@@ -1,0 +1,16 @@
+import QtQuick
+
+import org.kde.plasma.configuration
+
+ConfigModel {
+    ConfigCategory {
+        name: i18n("Apps")
+        icon: "view-list-icons"
+        source: "ConfigApps.qml"
+    }
+    ConfigCategory {
+        name: i18n("Appearance")
+        icon: "preferences-desktop-theme"
+        source: "ConfigAppearance.qml"
+    }
+}
