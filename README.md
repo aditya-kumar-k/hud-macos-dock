@@ -10,6 +10,16 @@ apps are not added to it.
 - **Horizontal or vertical**, with adjustable icon size, spacing, zoom and labels
 - A settings window with a searchable app picker, reordering and glass controls
 
+## Screenshots
+
+Horizontal, along the bottom edge:
+
+![HUD Dock, horizontal](screenshots/dock-horizontal.png)
+
+Vertical, on the left edge:
+
+![HUD Dock, vertical](screenshots/dock-vertical.png)
+
 ## Requirements
 
 - KDE Plasma 6.0 or newer
