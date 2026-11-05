@@ -6,7 +6,7 @@
     <kcfgfile name=""/>
     <group name="General">
         <entry name="apps" type="String">
-            <label>JSON array of dock apps: [{id, name, icon, path}]</label>
+            <label>Ordered JSON array of apps {id, name, icon, path, desktopName, desktopIcon, customName, customIcon} and separators {type: "separator", style: "spacer" or "line"}</label>
             <default>[]</default>
         </entry>
         <entry name="iconSize" type="Int">
