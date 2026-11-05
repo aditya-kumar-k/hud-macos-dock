@@ -5,6 +5,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasma5support as Plasma5Support
 import org.kde.kirigami as Kirigami
+import "../code/DesktopFiles.js" as DesktopFiles
 
 PlasmoidItem {
     id: root
@@ -30,6 +31,58 @@ PlasmoidItem {
     readonly property int gap: Plasmoid.configuration.spacing
     readonly property bool vertical: Plasmoid.configuration.vertical
     readonly property bool showLabels: Plasmoid.configuration.showLabels
+    property string dropError: ""
+    property int dropRequest: 0
+
+    function reportDropError(message) {
+        dropError = message
+        console.warn("HUD Dock:", message)
+        dropErrorTimer.restart()
+    }
+
+    function addDesktopFiles(urls) {
+        if (!DesktopFiles.acceptsUrls(urls)) {
+            reportDropError(i18n("Drop local .desktop files to add applications."))
+            return
+        }
+        dropError = ""
+        var scriptUrl = Qt.resolvedUrl("../code/listapps.py").toString()
+        var script = decodeURIComponent(scriptUrl.replace(/^file:\/\//, ""))
+        var command = "python3 " + DesktopFiles.shellQuote(script) + " --desktop-files "
+            + urls.map(function (url) { return DesktopFiles.shellQuote(String(url)) }).join(" ")
+        importer.connectSource(command + " #drop-" + (++dropRequest))
+    }
+
+    Plasma5Support.DataSource {
+        id: importer
+        engine: "executable"
+        connectedSources: []
+        onNewData: function (source, data) {
+            disconnectSource(source)
+            if (data["exit code"] !== 0) {
+                root.reportDropError(i18n("Could not read desktop files: %1", data["stderr"] || data["exit code"]))
+                return
+            }
+            var result
+            try {
+                result = JSON.parse(data["stdout"])
+                if (!result || !Array.isArray(result.apps) || !Array.isArray(result.errors))
+                    throw new Error("Invalid desktop file importer response")
+            } catch (error) {
+                root.reportDropError(i18n("Could not read desktop files: %1", String(error)))
+                return
+            }
+            Plasmoid.configuration.apps = JSON.stringify(DesktopFiles.appendApps(root.apps, result.apps))
+            if (result.errors.length > 0)
+                root.reportDropError(i18n("Some desktop files could not be added:\n%1", result.errors.join("\n")))
+        }
+    }
+
+    Timer {
+        id: dropErrorTimer
+        interval: 10000
+        onTriggered: root.dropError = ""
+    }
 
     readonly property real pad: Math.round(iconSize * 0.28)
     // Extra room along the dock for the magnified icons spreading out

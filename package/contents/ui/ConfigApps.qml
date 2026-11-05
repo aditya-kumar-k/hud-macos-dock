@@ -4,6 +4,7 @@ import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
 import org.kde.kcmutils as KCM
 import org.kde.plasma.plasma5support as Plasma5Support
+import "../code/DesktopFiles.js" as DesktopFiles
 
 KCM.SimpleKCM {
     id: page
@@ -61,13 +62,7 @@ KCM.SimpleKCM {
     }
 
     function addApp(app) {
-        for (var i = 0; i < current.length; i++) {
-            if (current[i].id === app.id)
-                return
-        }
-        var arr = current.slice()
-        arr.push({ id: app.id, name: app.name, icon: app.icon, path: app.path })
-        commit(arr)
+        commit(DesktopFiles.appendApps(current, [app]))
     }
 
     function removeAt(i) {

@@ -39,10 +39,19 @@ kpackagetool6 --type Plasma/Applet --install com.aadi.huddock.plasmoid
 From this repository:
 
 ```sh
-kpackagetool6 --type Plasma/Applet --install package
+kpackagetool6 --type Plasma/Applet --install "$(pwd)/package"
 ```
 
-To update an existing install use `--upgrade` instead of `--install`, then restart
+Run this from the repository root. Use an absolute package path so KPackage does
+not interpret `package` as an installed plugin name.
+
+To update an existing install:
+
+```sh
+kpackagetool6 --type Plasma/Applet --upgrade "$(pwd)/package"
+```
+
+Then restart
 plasmashell (`kquitapp6 plasmashell; kstart plasmashell`).
 
 Then right-click the desktop, choose **Enter Edit Mode → Add Widgets**, and drag
@@ -50,6 +59,11 @@ Then right-click the desktop, choose **Enter Edit Mode → Add Widgets**, and dr
 
 ## Use
 
+- Drag one or more local `.desktop` application files onto the dock to append them.
+  The shelf highlights while dragging; existing entries are not duplicated. This
+  also works in the shortcut pop-up and in either orientation. Files are read, not
+  copied or launched, so keep them at their original paths. Only add launchers you
+  trust: clicking their icons later runs the applications they define.
 - Right-click the dock → **Configure** to add, reorder and remove apps and to change
   the look.
 - Right-click an icon for **Open**, **Remove from dock** and **Dock settings**.
@@ -90,6 +104,22 @@ wallpaper to sample (for example, in a panel), it falls back to a plain transluc
 
 ```sh
 ./make-package.sh        # creates dist/com.aadi.huddock.plasmoid
+```
+
+## Tests
+
+Run the importer tests with Python 3. If PyQt6 is installed, this also tests native
+file drag-and-drop events against the QML drop area:
+
+```sh
+QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software python3 -m unittest discover -s tests -v
+```
+
+Run the shared QML helper tests with the Qt 6 `qmltestrunner` (its location depends
+on the distribution):
+
+```sh
+QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests
 ```
 
 ## Support

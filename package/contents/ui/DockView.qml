@@ -11,7 +11,7 @@ Item {
     required property var host
     // True when shown in the floating on-top window opened by the shortcut
     property bool overlay: false
-    readonly property alias hovered: hover.hovered
+    readonly property bool hovered: hover.hovered || dropArea.containsDrag
     readonly property alias contentItem: content
 
     signal launched()
@@ -70,6 +70,18 @@ Item {
             anchors.left: dock.vertical ? parent.left : undefined
 
             readonly property real mainSize: dock.vertical ? height : width
+
+            DesktopDropArea {
+                id: dropArea
+                anchors.fill: parent
+                onFilesDropped: function (urls) { dock.host.addDesktopFiles(urls) }
+            }
+
+            Controls.ToolTip {
+                visible: host.dropError.length > 0
+                text: host.dropError
+                width: Math.min(420, implicitWidth)
+            }
 
             // Pointer position along the dock, and how strongly magnification applies (0..1)
             property real mAxis: 0
@@ -161,11 +173,24 @@ Item {
                 y: dock.vertical ? (content.height - height) / 2 : content.height - height
             }
 
+            Rectangle {
+                anchors.fill: card
+                z: 1
+                visible: dropArea.containsDrag
+                radius: card.radius
+                color: Qt.rgba(1, 1, 1, 0.12)
+                border.width: 2
+                border.color: Kirigami.Theme.highlightColor
+            }
+
             Text {
                 visible: host.apps.length === 0
                 z: 1
                 anchors.centerIn: card
-                text: i18n("Right-click → Configure to add apps")
+                width: content.width - 2 * host.pad
+                text: i18n("Drop .desktop files here or right-click → Configure")
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
                 color: "#e8eef3"
                 font.pixelSize: 13
             }
