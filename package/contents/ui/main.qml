@@ -5,12 +5,52 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasma5support as Plasma5Support
 import org.kde.kirigami as Kirigami
+import "../code/DesktopFiles.js" as DesktopFiles
+import "../code/DockItems.js" as DockItems
 
 PlasmoidItem {
     id: root
 
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
     preferredRepresentation: fullRepresentation
+
+    Plasmoid.contextualActions: [
+        PlasmaCore.Action {
+            id: duplicateAction
+            text: i18n("Duplicate widget")
+            icon.name: "edit-copy"
+            enabled: duplicator.available && !duplicator.busy
+            onTriggered: root.duplicateWidget()
+        }
+    ]
+
+    WidgetDuplicator {
+        id: duplicator
+        objectName: "widgetDuplicator"
+        applet: Plasmoid
+        onFailed: function (message) { root.reportDropError(message) }
+        onRequested: function (payload) {
+            var script = decodeURIComponent(Qt.resolvedUrl("../code/duplicatewidget.py").toString().replace(/^file:\/\//, ""))
+            duplicateRunner.connectSource("python3 " + DesktopFiles.shellQuote(script)
+                + " " + DesktopFiles.shellQuote(payload))
+        }
+    }
+
+    Plasma5Support.DataSource {
+        id: duplicateRunner
+        engine: "executable"
+        connectedSources: []
+        onNewData: function (source, data) {
+            disconnectSource(source)
+            duplicator.complete(data["exit code"], data["stdout"], data["stderr"])
+        }
+    }
+
+    readonly property bool canDuplicate: duplicateAction.enabled
+
+    function duplicateWidget() {
+        duplicator.duplicate()
+    }
 
     // The shortcut pops the dock up over whatever window is open
     Plasmoid.onActivated: {
@@ -30,11 +70,102 @@ PlasmoidItem {
     readonly property int gap: Plasmoid.configuration.spacing
     readonly property bool vertical: Plasmoid.configuration.vertical
     readonly property bool showLabels: Plasmoid.configuration.showLabels
+    readonly property int bounceCount: Plasmoid.configuration.bounceCount
+    readonly property real glassTint: Plasmoid.configuration.glassTint / 100
+    readonly property real glassBlur: Plasmoid.configuration.glassBlur / 100
+    readonly property real glassSheen: Plasmoid.configuration.glassSheen / 100
+    property string dropError: ""
+    property int dropRequest: 0
+
+    function reorderItems(from, to) {
+        Plasmoid.configuration.apps = JSON.stringify(DockItems.move(apps, from, to))
+    }
+
+    function removeItem(index) {
+        var updated = apps.slice()
+        updated.splice(index, 1)
+        Plasmoid.configuration.apps = JSON.stringify(updated)
+    }
+
+    function configureDock() {
+        Plasmoid.internalAction("configure").trigger()
+    }
+
+    function launchApplication(app) {
+        var path = DesktopFiles.shellQuote(app.path || "")
+        var id = DesktopFiles.shellQuote((app.id || "").replace(/\.desktop$/, ""))
+        runner.connectSource("(gio launch " + path + " || gtk-launch " + id + ") #" + Date.now())
+    }
+
+    Plasma5Support.DataSource {
+        id: runner
+        engine: "executable"
+        connectedSources: []
+        onNewData: function (source, data) { disconnectSource(source) }
+    }
+
+    DesktopSync {
+        items: root.apps
+        paused: (root.fullRepresentationItem && root.fullRepresentationItem.reordering)
+            || (overlay.mainItem && overlay.mainItem.reordering)
+        onRefreshed: function (items) { Plasmoid.configuration.apps = JSON.stringify(items) }
+        onFailed: function (message) { root.reportDropError(message) }
+    }
+
+    function reportDropError(message) {
+        dropError = message
+        console.warn("HUD Dock:", message)
+        dropErrorTimer.restart()
+    }
+
+    function addDesktopFiles(urls) {
+        if (!DesktopFiles.acceptsUrls(urls)) {
+            reportDropError(i18n("Drop local .desktop files to add applications."))
+            return
+        }
+        dropError = ""
+        var scriptUrl = Qt.resolvedUrl("../code/listapps.py").toString()
+        var script = decodeURIComponent(scriptUrl.replace(/^file:\/\//, ""))
+        var command = "python3 " + DesktopFiles.shellQuote(script) + " --desktop-files "
+            + urls.map(function (url) { return DesktopFiles.shellQuote(String(url)) }).join(" ")
+        importer.connectSource(command + " #drop-" + (++dropRequest))
+    }
+
+    Plasma5Support.DataSource {
+        id: importer
+        engine: "executable"
+        connectedSources: []
+        onNewData: function (source, data) {
+            disconnectSource(source)
+            if (data["exit code"] !== 0) {
+                root.reportDropError(i18n("Could not read desktop files: %1", data["stderr"] || data["exit code"]))
+                return
+            }
+            var result
+            try {
+                result = JSON.parse(data["stdout"])
+                if (!result || !Array.isArray(result.apps) || !Array.isArray(result.errors))
+                    throw new Error("Invalid desktop file importer response")
+            } catch (error) {
+                root.reportDropError(i18n("Could not read desktop files: %1", String(error)))
+                return
+            }
+            Plasmoid.configuration.apps = JSON.stringify(DesktopFiles.appendApps(root.apps, result.apps))
+            if (result.errors.length > 0)
+                root.reportDropError(i18n("Some desktop files could not be added:\n%1", result.errors.join("\n")))
+        }
+    }
+
+    Timer {
+        id: dropErrorTimer
+        interval: 10000
+        onTriggered: root.dropError = ""
+    }
 
     readonly property real pad: Math.round(iconSize * 0.28)
     // Extra room along the dock for the magnified icons spreading out
     readonly property real slack: Math.ceil(iconSize * (zoom - 1) * 2.6)
-    readonly property real baseLen: apps.length > 0 ? apps.length * iconSize + (apps.length - 1) * gap : iconSize
+    readonly property real baseLen: apps.length > 0 ? DockItems.baseLength(apps, iconSize, gap) : iconSize
     readonly property real mainLen: Math.ceil(baseLen + 2 * pad + slack)
     // Room across the dock for the magnified icon, a launch bounce and the label
     readonly property real crossLen: Math.ceil(iconSize * zoom + 2 * pad + iconSize * 0.6 + (showLabels ? 34 : 0))

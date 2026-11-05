@@ -1,9 +1,8 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as Controls
-import org.kde.plasma.plasmoid
-import org.kde.plasma.plasma5support as Plasma5Support
 import org.kde.kirigami as Kirigami
+import "../code/DockItems.js" as DockItems
 
 Item {
     id: dock
@@ -11,8 +10,9 @@ Item {
     required property var host
     // True when shown in the floating on-top window opened by the shortcut
     property bool overlay: false
-    readonly property alias hovered: hover.hovered
+    readonly property bool hovered: hover.hovered || dropArea.containsDrag || reorder.dragging
     readonly property alias contentItem: content
+    readonly property bool reordering: reorder.dragging
 
     signal launched()
 
@@ -26,24 +26,10 @@ Item {
         implicitWidth: Layout.minimumWidth
         implicitHeight: Layout.minimumHeight
 
-        Plasma5Support.DataSource {
-            id: runner
-            engine: "executable"
-            connectedSources: []
-            onNewData: function (source, data) {
-                disconnectSource(source)
-            }
-            function run(app) {
-                var path = (app.path || "").replace(/'/g, "'\\''")
-                var id = (app.id || "").replace(/\.desktop$/, "").replace(/'/g, "'\\''")
-                connectSource("(gio launch '" + path + "' || gtk-launch '" + id + "') #" + Date.now())
-            }
-        }
-
         function launch(index) {
-            if (index < 0 || index >= host.apps.length)
+            if (index < 0 || index >= host.apps.length || DockItems.isSeparator(host.apps[index]))
                 return
-            runner.run(host.apps[index])
+            host.launchApplication(host.apps[index])
             var tile = tiles.itemAt(index)
             if (tile)
                 tile.bounce()
@@ -54,9 +40,7 @@ Item {
         function removeApp(index) {
             if (index < 0 || index >= host.apps.length)
                 return
-            var arr = host.apps.slice()
-            arr.splice(index, 1)
-            Plasmoid.configuration.apps = JSON.stringify(arr)
+            host.removeItem(index)
         }
 
         Item {
@@ -71,9 +55,22 @@ Item {
 
             readonly property real mainSize: dock.vertical ? height : width
 
+            DesktopDropArea {
+                id: dropArea
+                anchors.fill: parent
+                onFilesDropped: function (urls) { dock.host.addDesktopFiles(urls) }
+            }
+
+            Controls.ToolTip {
+                visible: host.dropError.length > 0
+                text: host.dropError
+                width: Math.min(420, implicitWidth)
+            }
+
             // Pointer position along the dock, and how strongly magnification applies (0..1)
             property real mAxis: 0
             property real factor: 0
+            property var frozenLayout: null
 
             Behavior on mAxis {
                 enabled: hover.hovered
@@ -83,44 +80,14 @@ Item {
                 NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
             }
 
-            readonly property var lay: computeLayout(mAxis, factor, host.apps.length, host.iconSize, host.gap, host.zoom, mainSize)
+            readonly property var lay: reorder.dragging && frozenLayout ? frozenLayout
+                : DockItems.computeLayout(mAxis, factor, host.apps, host.iconSize, host.gap, host.zoom, mainSize)
             readonly property int hoverIdx: hover.hovered ? indexAt(mAxis, lay) : -1
+            readonly property var previewPositions: DockItems.previewPositions(lay,
+                reorder.dragging ? reorder.sourceIndex : -1, reorder.targetIndex, host.gap)
 
-            // Scale and position of every icon for a pointer at m along the dock
-            function computeLayout(m, f, n, size, gap, zoom, length) {
-                var scales = []
-                var pos = []
-                var total = Math.max(0, n - 1) * gap
-                var baseLen = n * size + Math.max(0, n - 1) * gap
-                var start0 = (length - baseLen) / 2
-                var sigma = size * 0.85
-                for (var i = 0; i < n; i++) {
-                    var c = start0 + i * (size + gap) + size / 2
-                    var d = m - c
-                    var s = 1 + (zoom - 1) * Math.exp(-(d * d) / (2 * sigma * sigma)) * f
-                    scales.push(s)
-                    total += size * s
-                }
-                var p = (length - total) / 2
-                for (var j = 0; j < n; j++) {
-                    pos.push(p)
-                    p += size * scales[j] + gap
-                }
-                return { scales: scales, pos: pos, total: total }
-            }
-
-            function indexAt(m, layout) {
-                var best = -1
-                var bestDist = 1e9
-                for (var i = 0; i < layout.pos.length; i++) {
-                    var s = host.iconSize * layout.scales[i]
-                    var d = Math.abs(m - (layout.pos[i] + s / 2))
-                    if (d < bestDist && d <= s / 2 + host.gap / 2) {
-                        bestDist = d
-                        best = i
-                    }
-                }
-                return best
+            function indexAt(m, layout, includeSeparators) {
+                return DockItems.indexAt(m, layout, host.apps, host.gap, includeSeparators)
             }
 
             HoverHandler {
@@ -137,11 +104,35 @@ Item {
                 }
             }
 
+            ReorderDrag {
+                id: reorder
+                objectName: "dockReorder"
+                anchors.fill: parent
+                items: dock.host.apps
+                function indexAtPosition(point, starting) {
+                    var axis = dock.vertical ? point.y : point.x
+                    var index = content.indexAt(axis, content.lay, true)
+                    if (index < 0 || !content.contains(point))
+                        return -1
+                    if (starting) {
+                        var tile = tiles.itemAt(index)
+                        if (!tile || !tile.contains(tile.mapFromItem(reorder, point.x, point.y)))
+                            return -1
+                    }
+                    return index
+                }
+                onStarted: content.frozenLayout = content.lay
+                onDraggingChanged: if (!dragging) content.frozenLayout = null
+                onMoveRequested: function (from, to) {
+                    dock.host.reorderItems(from, to)
+                }
+            }
+
             TapHandler {
                 acceptedButtons: Qt.RightButton
                 onTapped: function (eventPoint) {
                     var m = dock.vertical ? eventPoint.position.y : eventPoint.position.x
-                    itemMenu.target = content.indexAt(m, content.lay)
+                    itemMenu.target = content.indexAt(m, content.lay, true)
                     itemMenu.popup()
                 }
             }
@@ -151,9 +142,9 @@ Item {
                 id: card
                 z: 0
                 useBlur: !dock.overlay
-                tint: Plasmoid.configuration.glassTint / 100
-                blurAmount: Plasmoid.configuration.glassBlur / 100
-                sheen: Plasmoid.configuration.glassSheen / 100
+                tint: host.glassTint
+                blurAmount: host.glassBlur
+                sheen: host.glassSheen
                 radius: Math.round(host.iconSize * 0.4)
                 width: dock.vertical ? host.iconSize + 2 * host.pad : content.lay.total + 2 * host.pad
                 height: dock.vertical ? content.lay.total + 2 * host.pad : host.iconSize + 2 * host.pad
@@ -161,13 +152,38 @@ Item {
                 y: dock.vertical ? (content.height - height) / 2 : content.height - height
             }
 
+            Rectangle {
+                anchors.fill: card
+                z: 1
+                visible: dropArea.containsDrag
+                radius: card.radius
+                color: Qt.rgba(1, 1, 1, 0.12)
+                border.width: 2
+                border.color: Kirigami.Theme.highlightColor
+            }
+
             Text {
                 visible: host.apps.length === 0
                 z: 1
                 anchors.centerIn: card
-                text: i18n("Right-click → Configure to add apps")
+                width: content.width - 2 * host.pad
+                text: i18n("Drop .desktop files here or right-click → Configure")
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
                 color: "#e8eef3"
                 font.pixelSize: 13
+            }
+
+            DragPreview {
+                objectName: "dockDragPreview"
+                visible: reorder.dragging
+                app: reorder.dragging ? dock.host.apps[reorder.sourceIndex] : null
+                iconSource: dock.host.iconSource(app ? app.icon : "")
+                iconSize: dock.host.iconSize
+                showName: false
+                accepted: reorder.targetIndex >= 0
+                x: reorder.pointerPosition.x - width / 2
+                y: reorder.pointerPosition.y - height / 2 - 12
             }
 
             Repeater {
@@ -178,31 +194,64 @@ Item {
                     id: tile
 
                     required property int index
+                    objectName: "dockTile" + index
                     readonly property var app: host.apps[index]
+                    readonly property bool separator: DockItems.isSeparator(app)
                     readonly property real s: host.iconSize * (content.lay.scales[index] !== undefined ? content.lay.scales[index] : 1)
+                    readonly property real mainSize: content.lay.widths[index] || 0
                     property real bounceOff: 0
+                    opacity: reorder.dragging && reorder.sourceIndex === index ? 0.2 : 1
 
                     z: 2
-                    width: s
-                    height: s
-                    x: dock.vertical ? host.pad + bounceOff : (content.lay.pos[index] || 0)
-                    y: dock.vertical ? (content.lay.pos[index] || 0) : content.height - host.pad - s - bounceOff
+                    width: dock.vertical ? s : mainSize
+                    height: dock.vertical ? mainSize : s
+                    x: dock.vertical ? host.pad + bounceOff : (content.previewPositions[index] || 0)
+                    y: dock.vertical ? (content.previewPositions[index] || 0) : content.height - host.pad - s - bounceOff
+
+                    Behavior on x {
+                        enabled: reorder.animating
+                        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                    }
+                    Behavior on y {
+                        enabled: reorder.animating
+                        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                    }
 
                     function bounce() {
-                        if (Plasmoid.configuration.bounceCount > 0)
+                        if (host.bounceCount > 0)
                             bounceAnim.restart()
                     }
 
+                    Rectangle {
+                        anchors.fill: parent
+                        visible: reorder.dragging && reorder.sourceIndex === tile.index && reorder.targetIndex >= 0
+                        color: Qt.rgba(1, 1, 1, 0.12)
+                        border.color: Kirigami.Theme.highlightColor
+                        border.width: 2
+                        radius: 4
+                    }
+
                     Kirigami.Icon {
+                        visible: !tile.separator
                         anchors.fill: parent
                         source: host.iconSource(tile.app ? tile.app.icon : "")
                         roundToIconSize: false
                         smooth: true
                     }
 
+                    Rectangle {
+                        visible: tile.separator && tile.app.style === "line"
+                        anchors.centerIn: parent
+                        width: dock.vertical ? host.iconSize * 0.65 : 2
+                        height: dock.vertical ? 2 : host.iconSize * 0.65
+                        radius: 1
+                        color: "#e8eef3"
+                        opacity: 0.4
+                    }
+
                     SequentialAnimation {
                         id: bounceAnim
-                        loops: Math.max(1, Plasmoid.configuration.bounceCount)
+                        loops: Math.max(1, host.bounceCount)
                         NumberAnimation {
                             target: tile
                             property: "bounceOff"
@@ -229,7 +278,7 @@ Item {
                 readonly property real itemSize: idx >= 0 ? host.iconSize * content.lay.scales[idx] : 0
                 readonly property real itemPos: idx >= 0 ? content.lay.pos[idx] : 0
 
-                visible: host.showLabels && idx >= 0 && content.factor > 0.3
+                visible: host.showLabels && idx >= 0 && content.factor > 0.3 && !reorder.dragging
                 width: labelText.implicitWidth + 20
                 height: labelText.implicitHeight + 10
                 radius: 8
@@ -255,11 +304,12 @@ Item {
 
             Controls.Menu {
                 id: itemMenu
+                objectName: "dockContextMenu"
                 property int target: -1
 
                 Controls.MenuItem {
                     text: i18n("Open")
-                    enabled: itemMenu.target >= 0
+                    enabled: itemMenu.target >= 0 && !DockItems.isSeparator(host.apps[itemMenu.target])
                     onTriggered: dock.launch(itemMenu.target)
                 }
                 Controls.MenuItem {
@@ -269,8 +319,15 @@ Item {
                 }
                 Controls.MenuSeparator {}
                 Controls.MenuItem {
+                    objectName: "duplicateWidgetAction"
+                    text: i18n("Duplicate widget")
+                    icon.name: "edit-copy"
+                    enabled: dock.host.canDuplicate
+                    onTriggered: dock.host.duplicateWidget()
+                }
+                Controls.MenuItem {
                     text: i18n("Dock settings…")
-                    onTriggered: Plasmoid.internalAction("configure").trigger()
+                    onTriggered: dock.host.configureDock()
                 }
             }
         }
