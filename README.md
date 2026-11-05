@@ -91,6 +91,15 @@ Then right-click the desktop, choose **Enter Edit Mode → Add Widgets**, and dr
   Settings changes use the configuration window's usual **Apply** action; changes
   made directly on the dock are saved immediately.
 - Right-click an icon for **Open**, **Remove from dock** and **Dock settings**.
+- Choose **Duplicate widget** from the dock's right-click menu or Plasma's widget
+  context menu to create another HUD Dock in the same desktop or panel. The copy
+  keeps the saved applications, separators, ordering, custom launcher values and
+  appearance, but subsequent changes are independent. Plasma chooses the final
+  placement, with a small offset requested on the desktop.
+  The global keyboard shortcut is not copied to avoid conflicting activations.
+  Unlock widgets first if this option is disabled. Duplication requires a running
+  Plasma Shell and the Qt D-Bus command-line tool (`qdbus6`, `qdbus-qt6` or `qdbus`);
+  missing tools, locked sessions and creation failures are reported on the dock.
 - **Pop-up shortcut:** in edit mode, right-click the dock → *Configure → Keyboard
   Shortcuts*, and assign a key to *Activate HUD Dock Widget*. Pressing it shows a copy
   of the dock above the windows. It hides itself a few seconds after you stop using it.

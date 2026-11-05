@@ -304,6 +304,7 @@ Item {
 
             Controls.Menu {
                 id: itemMenu
+                objectName: "dockContextMenu"
                 property int target: -1
 
                 Controls.MenuItem {
@@ -317,6 +318,13 @@ Item {
                     onTriggered: dock.removeApp(itemMenu.target)
                 }
                 Controls.MenuSeparator {}
+                Controls.MenuItem {
+                    objectName: "duplicateWidgetAction"
+                    text: i18n("Duplicate widget")
+                    icon.name: "edit-copy"
+                    enabled: dock.host.canDuplicate
+                    onTriggered: dock.host.duplicateWidget()
+                }
                 Controls.MenuItem {
                     text: i18n("Dock settings…")
                     onTriggered: dock.host.configureDock()

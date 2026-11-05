@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Add "Duplicate widget" to the dock and Plasma context menus, copying launcher
+  settings and appearance into an independent instance on the same desktop/panel.
 - Add visible six-dot drag grips in settings, pointer-following previews and
   animated space-making feedback in settings and both live dock orientations.
 - Drag applications and separators to reorder them in settings and on the live

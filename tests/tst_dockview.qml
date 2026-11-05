@@ -39,9 +39,12 @@ TestCase {
             property string dropError: ""
             property int launches: 0
             property string saved: ""
+            property bool canDuplicate: true
+            property int duplicates: 0
 
             function iconSource(icon) { return icon }
             function launchApplication(app) { launches++ }
+            function duplicateWidget() { duplicates++ }
             function reorderItems(from, to) {
                 apps = DockItems.move(apps, from, to)
                 saved = JSON.stringify(apps)
@@ -149,6 +152,36 @@ TestCase {
             { tag: "vertical", vertical: true, overlay: false },
             { tag: "popup", vertical: false, overlay: true }
         ]
+    }
+
+    function test_duplicateMenu_data() {
+        return [
+            { tag: "desktop", overlay: false, vertical: false },
+            { tag: "vertical", overlay: false, vertical: true },
+            { tag: "popup", overlay: true, vertical: false }
+        ]
+    }
+
+    function test_duplicateMenu(data) {
+        host.vertical = data.vertical
+        view.overlay = data.overlay
+        waitForRendering(view)
+        mouseClick(findChild(view, "dockTile0"), undefined, undefined, Qt.RightButton)
+        var menu = findChild(view, "dockContextMenu")
+        tryCompare(menu, "opened", true)
+        var action = findChild(view, "duplicateWidgetAction")
+        compare(action.text, "Duplicate widget")
+        verify(action.enabled)
+        mouseClick(action)
+        compare(host.duplicates, 1)
+        compare(host.launches, 0)
+        compare(host.apps, [first, spacer, line, last])
+    }
+
+    function test_duplicateMenuDisabledWhenLocked() {
+        host.canDuplicate = false
+        waitForRendering(view)
+        verify(!findChild(view, "duplicateWidgetAction").enabled)
     }
 
     function test_feedback(data) {

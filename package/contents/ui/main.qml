@@ -14,6 +14,44 @@ PlasmoidItem {
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
     preferredRepresentation: fullRepresentation
 
+    Plasmoid.contextualActions: [
+        PlasmaCore.Action {
+            id: duplicateAction
+            text: i18n("Duplicate widget")
+            icon.name: "edit-copy"
+            enabled: duplicator.available && !duplicator.busy
+            onTriggered: root.duplicateWidget()
+        }
+    ]
+
+    WidgetDuplicator {
+        id: duplicator
+        objectName: "widgetDuplicator"
+        applet: Plasmoid
+        onFailed: function (message) { root.reportDropError(message) }
+        onRequested: function (payload) {
+            var script = decodeURIComponent(Qt.resolvedUrl("../code/duplicatewidget.py").toString().replace(/^file:\/\//, ""))
+            duplicateRunner.connectSource("python3 " + DesktopFiles.shellQuote(script)
+                + " " + DesktopFiles.shellQuote(payload))
+        }
+    }
+
+    Plasma5Support.DataSource {
+        id: duplicateRunner
+        engine: "executable"
+        connectedSources: []
+        onNewData: function (source, data) {
+            disconnectSource(source)
+            duplicator.complete(data["exit code"], data["stdout"], data["stderr"])
+        }
+    }
+
+    readonly property bool canDuplicate: duplicateAction.enabled
+
+    function duplicateWidget() {
+        duplicator.duplicate()
+    }
+
     // The shortcut pops the dock up over whatever window is open
     Plasmoid.onActivated: {
         if (overlay.visible) {
