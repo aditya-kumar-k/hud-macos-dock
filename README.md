@@ -106,9 +106,16 @@ wallpaper to sample (for example, in a panel), it falls back to a plain transluc
 ./make-package.sh        # creates dist/com.aadi.huddock.plasmoid
 ```
 
+Each successful build increments the numeric SemVer build metadata in
+`KPlugin.Version` in [package/metadata.json](package/metadata.json), for example
+`1.1.0` -> `1.1.0+1` -> `1.1.0+2`. The saved version and the version inside the
+package match. Major, minor, patch and any prerelease suffix are preserved; setting
+a new release version without `+BUILD` restarts its build counter at 1.
+The build requires Python 3 and uses its standard-library ZIP support.
+
 ## Tests
 
-Run the importer tests with Python 3. If PyQt6 is installed, this also tests native
+Run the importer and packaging tests with Python 3. If PyQt6 is installed, this also tests native
 file drag-and-drop events against the QML drop area:
 
 ```sh

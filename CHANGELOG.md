@@ -1,6 +1,7 @@
 # Changelog
 
-## Unreleased
+## 1.1.0
+- Automatically increment numeric SemVer build metadata when packaging.
 - Add applications by dropping local `.desktop` files onto either dock view, with
   drag feedback, duplicate prevention and import errors.
 
